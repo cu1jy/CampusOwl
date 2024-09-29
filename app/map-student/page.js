@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Script from 'next/script';
 import { initializeApp } from "firebase/app";
-import { getDatabase, ref, set, onValue } from "firebase/database";
+import { getDatabase, ref, set, onValue, push } from "firebase/database";
 
 const PICKUP_LOCATIONS = [
     { name: "Central Campus Transit Center", lat: 42.2778, lng: -83.7382 },
