@@ -5,6 +5,21 @@ import Script from 'next/script';
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, set, onValue } from "firebase/database";
 
+const PICKUP_LOCATIONS = [
+    { name: "Central Campus Transit Center", lat: 42.2778, lng: -83.7382 },
+    { name: "North Campus", lat: 42.2936, lng: -83.7167 },
+    { name: "South Quad", lat: 42.2746, lng: -83.7408 },
+    { name: "Michigan Union", lat: 42.2748, lng: -83.7422 },
+    { name: "Bursley Hall", lat: 42.2925, lng: -83.7193 }
+];
+
+const DRIVER_LOCATIONS = [
+    { name: "Driver 1", lat: 42.2783, lng: -83.7375 },
+    { name: "Driver 2", lat: 42.2941, lng: -83.7153 },
+    { name: "Driver 3", lat: 42.2750, lng: -83.7413 },
+    { name: "Driver 4", lat: 42.2743, lng: -83.7430 }
+]
+
 export default function MapComponent() {
     const mapRef = useRef(null);
     const driverMarkerRef = useRef(null);
@@ -203,7 +218,7 @@ export default function MapComponent() {
     }
 
     return (
-        <main className="h-screen flex flex-col bg-gray-100">
+        <main className="h-screen w-screen flex flex-col bg-gray-100">
             <Script
                 src={`https://maps.googleapis.com/maps/api/js?key=AIzaSyCoY5Mc8LL_Frtd0oW5wXKj0_sEicPLUN0&libraries=geometry,places`}
                 onLoad={() => setMapLoaded(true)}
