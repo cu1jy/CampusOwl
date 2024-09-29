@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,15 +10,18 @@
             height: 700px;
             width: 100%;
         }
+
         #controls {
             margin: 10px;
         }
+
         #eta {
             font-weight: bold;
             margin-top: 10px;
         }
     </style>
 </head>
+
 <body>
     <div id="controls">
         <input id="destination-input" type="text" placeholder="Enter destination address">
@@ -25,7 +29,7 @@
     </div>
     <div id="map"></div>
     <div id="eta"></div> <!-- This will show the ETA -->
-    
+
     <script>
         let map, directionsService, directionsRenderer, userLocation;
 
@@ -163,6 +167,7 @@
     </script>
     <script async defer
         src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCoY5Mc8LL_Frtd0oW5wXKj0_sEicPLUN0&callback=initMap">
-    </script>
+        </script>
 </body>
+
 </html>
