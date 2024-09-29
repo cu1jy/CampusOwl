@@ -60,7 +60,7 @@ export default function Home() {
       <StudentNavbar />
       <div className="container mx-auto py-8">
         <h1 className="font-semibold text-black text-3xl text-center mb-10">
-          Articles
+          Campus Security Alerts
         </h1>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {articles.map((article, index) => (

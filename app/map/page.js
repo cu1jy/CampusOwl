@@ -93,7 +93,7 @@ export default function Map() {
     return (
         <main className='bg-white text-black'>
             <div id="controls" className='flex align-center h-10'>
-                <a href="/home" className="text-black pr-5">
+                <a href="/student-home" className="text-black pr-5">
                     <p>&lt;</p>
                 </a>
                 <input id="destination-input" type="text" placeholder="Enter destination address" />
