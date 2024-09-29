@@ -9,6 +9,7 @@ Students:
 - Access map with locations of campus security offices and ride pick-up locations
 - Live location tracking to find nearest ride pick-up location and place drive request
 - View your ride and incident report history
+
 Administrators:
 - View and add articles for students to see
 - Get live updates and locations for students' drive requests with matching feature that pairs drivers with closest pick-up location
