@@ -34,50 +34,19 @@ const DriveRequestItem = ({ id, requestTime, status, destination, onComplete, on
 
 export default function AdminDriveManagement() {
     // State for Pending and Completed Drives
-    const [pendingDrives, setPendingDrives] = useState([
-        { id: 1, requestTime: '2024-09-29 10:30 AM', status: 'Pending', destination: 'Downtown Library' },
-        { id: 2, requestTime: '2024-09-29 11:45 AM', status: 'Pending', destination: 'Science Building' },
-        { id: 3, requestTime: '2024-09-29 02:15 PM', status: 'Pending', destination: 'Student Center' },
-    ]);
 
     const [completedDrives, setCompletedDrives] = useState([
-        { id: 4, requestTime: '2024-09-28 09:00 AM', status: 'Completed', destination: 'Athletic Complex' },
-        { id: 5, requestTime: '2024-09-28 03:30 PM', status: 'Completed', destination: 'Main Hall' },
+        { id: 4, requestTime: '2024-09-28 11:00 PM', status: 'Completed', destination: 'South Quad' },
+        { id: 5, requestTime: '2024-09-28 02:30 AM', status: 'Completed', destination: 'Bursley' },
     ]);
-
-    // Function to handle completing a drive
-    const handleCompleteDrive = (id) => {
-        const driveToComplete = pendingDrives.find(drive => drive.id === id);
-        if (driveToComplete) {
-            setPendingDrives(pendingDrives.filter(drive => drive.id !== id));
-            setCompletedDrives([...completedDrives, { ...driveToComplete, status: 'Completed' }]);
-        }
-    };
-
-    // Function to handle cancelling a drive
-    const handleCancelDrive = (id) => {
-        setPendingDrives(pendingDrives.filter(drive => drive.id !== id));
-    };
 
     return (
         <main className="min-h-screen bg-gray-100">
             <AdminNavbar />
             <div className="container mx-auto py-8">
-                {/* Pending Drives Section */}
-                <h1 className="text-3xl font-semibold mb-6 text-black">Pending Drive Requests</h1>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
-                    {pendingDrives.map((drive) => (
-                        <DriveRequestItem
-                            key={drive.id}
-                            {...drive}
-                            onComplete={() => handleCompleteDrive(drive.id)}
-                            onCancel={() => handleCancelDrive(drive.id)}
-                        />
-                    ))}
-                </div>
 
                 {/* Completed Drives Section */}
-                <h2 className="text-2xl font-semibold mb-4 text-black">Completed Drive Requests</h2>
+                <h2 className="text-3xl font-semibold mb-g text-black">Completed Drive Requests</h2>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {completedDrives.map((drive) => (
                         <DriveRequestItem key={drive.id} {...drive} />
