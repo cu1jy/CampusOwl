@@ -3,7 +3,7 @@ import { useState } from 'react';
 import AdminNavbar from '../components/AdminNavbar';
 import { AlertTriangle, Bell, Shield, Plus, X } from 'lucide-react';
 
-const SecurityArticle = ({ title, description, icon: Icon, onDelete }) => (
+const SecurityArticle = ({ title, description, link, icon: Icon, onDelete }) => (
     <div className="bg-white p-6 rounded-lg shadow-md relative">
         <button
             onClick={onDelete}
@@ -17,19 +17,21 @@ const SecurityArticle = ({ title, description, icon: Icon, onDelete }) => (
             <h2 className="text-xl font-semibold text-black">{title}</h2>
         </div>
         <p className="text-gray-600">{description}</p>
-        <a href="#" className="text-blue-600 hover:underline mt-2 inline-block">Read more</a>
+        <a href={link} className="text-blue-600 hover:underline mt-2 inline-block">Read more</a>
     </div>
 );
 
 const AddArticleForm = ({ onClose, onSubmit }) => {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
+    const [link, setLink] = useState('');
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        onSubmit({ title, description, icon: Shield });
+        onSubmit({ title, description, link, icon: Shield });
         setTitle('');
         setDescription('');
+        setLink('');
         onClose();
     };
 
@@ -49,6 +51,14 @@ const AddArticleForm = ({ onClose, onSubmit }) => {
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         className="w-full p-2 mb-4 border rounded"
+                        required
+                    />
+                    <input
+                        type="text"
+                        placeholder="Article Link"
+                        value={link}
+                        onChange={(e) => setLink(e.target.value)}
+                        className='w-full p-2 mb-4 border rounded'
                         required
                     />
                     <textarea

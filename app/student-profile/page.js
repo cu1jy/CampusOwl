@@ -29,6 +29,7 @@ const Report = ({ title, date }) => (
         </div>
         <div>
             <StarRating />
+            {/* <p className="text-sm text-gray-500">Add feedback</p> */}
         </div>
     </div>
 );
@@ -36,10 +37,11 @@ const Report = ({ title, date }) => (
 const Ride = ({ date }) => (
     <div className="bg-white p-6 rounded-lg shadow-md flex justify-between items-center">
         <div>
-            <h2 className="text-xl font-semibold text-black">Ride at {date}</h2>
+            <h2 className="text-xl font-semibold text-black">{date}</h2>
         </div>
         <div>
             <StarRating />
+            {/* <p className="text-sm text-gray-500">Add feedback</p> */}
         </div>
     </div>
 );
