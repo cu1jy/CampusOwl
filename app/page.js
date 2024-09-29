@@ -8,21 +8,14 @@ export default function Home() {
           <h2 className="text-xl font-semibold text-black">Login</h2>
           <a
             className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center bg-blue-800 hover:bg-[#f2f2f2] dark:hover:bg-blue-500 hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="/home"
+            href="/student-home"
             rel="noopener noreferrer"
           >
             Student
           </a>
           <a
             className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center bg-blue-800 hover:bg-[#f2f2f2] dark:hover:bg-blue-500 hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="/login"
-            rel="noopener noreferrer"
-          >
-            RA
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center bg-blue-800 hover:bg-[#f2f2f2] dark:hover:bg-blue-500 hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="/login"
+            href="/admin-home"
             rel="noopener noreferrer"
           >
             Admin
