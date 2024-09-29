@@ -7,7 +7,7 @@ const StudentNavbar = () => {
             <div className="container mx-auto flex justify-between items-center">
                 <a href="/student-home" className="text-2xl font-bold">CampusOwl</a>
                 <div className="space-x-4">
-                    <a href="/map" className="hover:text-blue-200">Contact</a>
+                    <a href="/map-student" className="hover:text-blue-200">Contact</a>
                     <a href="student-profile" className="hover:text-blue-200">Profile</a>
                     <a href="/" className="hover:text-blue-200">Logout</a>
                 </div>

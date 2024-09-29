@@ -13,7 +13,7 @@ export default function LocationTrackerPage() {
     const [distance, setDistance] = useState(null);
 
     const firebaseConfig = {
-        apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+        apiKey: "AIzaSyCTQdkPz9GWnWiwSUv_yyxC8P1IPr1qW1M",
         authDomain: "campusowl-71f53.firebaseapp.com",
         databaseURL: "https://campusowl-71f53-default-rtdb.firebaseio.com",
         projectId: "campusowl-71f53",
