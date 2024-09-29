@@ -16,9 +16,10 @@ Administrators:
 - View records for drive requests
 
 ## Technologies
-Front-end
+Front-end:
 - React/NextJS
-Back-end
+
+Back-end:
 - Firebase's Real-Time Database
 - Google Maps API
 - Geolocation
