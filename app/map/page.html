@@ -29,11 +29,42 @@
     <script>
         let map, directionsService, directionsRenderer, userLocation;
 
+        const locations = [
+            { lat: 42.278631581793725, lng: -83.73130533501883, title: "STOCKWELL" },
+            { lat: 42.3314, lng: -83.0458, title: "Detroit, MI" },
+            { lat: 42.9634, lng: -85.6681, title: "Grand Rapids, MI" },
+            { lat: 41.8781, lng: -87.6298, title: "Chicago, IL" }
+        ];
+
+        const mapStyles = [
+            {
+                featureType: "poi", // Hide points of interest
+                elementType: "labels",
+                stylers: [{ visibility: "off" }]
+            },
+            {
+                featureType: "road", // Simplify road styles
+                elementType: "labels",
+                stylers: [{ visibility: "off" }]
+            },
+            {
+                featureType: "transit", // Hide transit stations and labels
+                elementType: "labels",
+                stylers: [{ visibility: "off" }]
+            },
+            {
+                featureType: "administrative", // Hide administrative boundaries and labels
+                elementType: "labels",
+                stylers: [{ visibility: "off" }]
+            }
+        ];
+
         function initMap() {
             // Initialize map with default options
             var options = {
                 zoom: 17,
-                center: { lat: 42.2808, lng: -83.7430 } // Default center (Ann Arbor, MI)
+                center: { lat: 42.2808, lng: -83.7430 }, // Default center (Ann Arbor, MI)
+                styles: mapStyles
             };
 
             map = new google.maps.Map(document.getElementById('map'), options);
@@ -60,6 +91,7 @@
                         map: map,
                         title: "Your Location"
                     });
+                    addMarkers();
 
                 }, function () {
                     handleLocationError(true, map.getCenter());
@@ -117,6 +149,16 @@
                     alert('Geocode was not successful for the following reason: ' + status);
                 }
             });
+
+            function addMarkers() {
+            locations.forEach(location => {
+                const marker = new google.maps.Marker({
+                    position: location,
+                    map: map,
+                    title: location.title
+                });
+            });
+        }
         }
     </script>
     <script async defer
