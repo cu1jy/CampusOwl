@@ -11,6 +11,7 @@ export default function LocationTrackerPage() {
     const [userLocation, setUserLocation] = useState(null);
     const [driverLocation, setDriverLocation] = useState(null);
     const [distance, setDistance] = useState(null);
+    const [eta, setEta] = useState(null);
 
     const firebaseConfig = {
         apiKey: "AIzaSyCTQdkPz9GWnWiwSUv_yyxC8P1IPr1qW1M",
@@ -39,6 +40,9 @@ export default function LocationTrackerPage() {
         });
 
         let userMarker, driverMarker;
+        let directionsService = new google.maps.DirectionsService();
+        let directionsRenderer = new google.maps.DirectionsRenderer();
+        directionsRenderer.setMap(map);
 
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(position => {
@@ -97,9 +101,30 @@ export default function LocationTrackerPage() {
                     setDriverLocation(driverLoc);
                     updateDriverMarker(map, driverLoc);
                     updateDistanceInfo(driverLoc);
+                    calculateRoute(driverLoc);
                 }
             }, (error) => {
                 console.error("Error listening for driver location: ", error);
+            });
+        }
+
+        function calculateRoute(driverLoc) {
+            if (!userLocation) return;
+
+            const request = {
+                origin: driverLoc,
+                destination: userLocation,
+                travelMode: 'DRIVING'
+            };
+
+            directionsService.route(request, function (result, status) {
+                if (status == 'OK') {
+                    directionsRenderer.setDirections(result);
+                    const duration = result.routes[0].legs[0].duration.text;
+                    setEta(duration);
+                } else {
+                    console.error('Directions request failed due to ' + status);
+                }
             });
         }
     }
@@ -115,12 +140,12 @@ export default function LocationTrackerPage() {
     }
 
     function simulateDriverMovement(database) {
-        let simulatedLat = 42.2808; // Starting latitude
-        let simulatedLng = -83.7430; // Starting longitude
+        let simulatedLat = 42.2955; // Starting latitude
+        let simulatedLng = -83.7200; // Starting longitude
 
         setInterval(() => {
-            simulatedLat += (Math.random() - 0.5) * 0.001;
-            simulatedLng += (Math.random() - 0.5) * 0.001;
+            simulatedLat += 0.0001;
+            simulatedLng -= 0.0001;
             updateLocation(database, "driver123", simulatedLat, simulatedLng);
         }, 5000); // Update every 5 seconds
     }
@@ -136,16 +161,22 @@ export default function LocationTrackerPage() {
     }
 
     return (
-        <main>
+        <main className='bg-white text-black'>
             <Script
                 src={`https://maps.googleapis.com/maps/api/js?key=AIzaSyCoY5Mc8LL_Frtd0oW5wXKj0_sEicPLUN0&libraries=geometry`}
                 onLoad={() => setMapLoaded(true)}
             />
+            <div id="controls" className='flex align-center h-10'>
+                <a href="/student-home" className="text-black pr-5">
+                    <p>&lt;</p>
+                </a>
+            </div>
             <div id="map" ref={mapRef} style={{ height: '600px', width: '100%' }}></div>
             <div id="info" style={{ marginTop: '10px' }}>
                 <p>User Location: {userLocation ? `${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)}` : 'Loading...'}</p>
                 <p>Driver Location: {driverLocation ? `${driverLocation.lat.toFixed(4)}, ${driverLocation.lng.toFixed(4)}` : 'Loading...'}</p>
                 <p>Distance between user and driver: {distance ? `${distance} km` : 'Calculating...'}</p>
+                <p>Estimated arrival time: {eta ? eta : 'Calculating...'}</p>
             </div>
         </main>
     );
