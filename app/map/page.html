@@ -155,14 +155,14 @@
             });
 
             function addMarkers() {
-            locations.forEach(location => {
-                const marker = new google.maps.Marker({
-                    position: location,
-                    map: map,
-                    title: location.title
+                locations.forEach(location => {
+                    const marker = new google.maps.Marker({
+                        position: location,
+                        map: map,
+                        title: location.title
+                    });
                 });
-            });
-        }
+            }
         }
     </script>
     <script async defer

@@ -60,7 +60,7 @@ export default function Map() {
                     const request = {
                         origin: userLocation,
                         destination: destinationLocation,
-                        travelMode: 'DRIVING'
+                        travelMode: 'WALKING'
                     };
 
                     directionsService.route(request, function (result, status) {
@@ -92,8 +92,8 @@ export default function Map() {
 
     return (
         <main className='bg-white text-black'>
-            <div id="controls" className='flex align-center'>
-                <a href="/home" class="text-black pr-5">
+            <div id="controls" className='flex align-center h-10'>
+                <a href="/home" className="text-black pr-5">
                     <p>&lt;</p>
                 </a>
                 <input id="destination-input" type="text" placeholder="Enter destination address" />
