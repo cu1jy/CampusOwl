@@ -143,7 +143,7 @@ export default function AdminMapComponent() {
             new google.maps.Marker({
                 position: { lat: request.destination.lat, lng: request.destination.lng },
                 map: newMap,
-                title: `Request ID: ${request.id}`,
+                title: `Drive Request`,
                 icon: "http://maps.google.com/mapfiles/ms/icons/red-dot.png" // Red dot for requests
             });
         })

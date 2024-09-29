@@ -61,14 +61,14 @@ export default function MapComponent() {
                 new google.maps.LatLng(userLocation.lat, userLocation.lng),
                 new google.maps.LatLng(nearestPickup.lat, nearestPickup.lng)
             );
-            setShowCallButton(distance <= 321.869); // 0.2 miles in meters
+            setShowCallButton(distance <= 900.869); // 0.2 miles in meters
         }
     }, [userLocation, nearestPickup]);
 
     function initMap(database) {
         const newMap = new google.maps.Map(mapRef.current, {
             zoom: 14,
-            center: { lat: 42.2808, lng: -83.7430 }, // Ann Arbor
+            center: { lat: 42.3, lng: -83.7230 }, // Ann Arbor
         });
 
         setMap(newMap);
