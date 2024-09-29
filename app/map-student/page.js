@@ -1,9 +1,16 @@
-'use client';
-
+"use client";
 import { useEffect, useRef, useState } from 'react';
 import Script from 'next/script';
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, set, onValue } from "firebase/database";
+
+const PICKUP_LOCATIONS = [
+    { name: "Central Campus Transit Center", lat: 42.2778, lng: -83.7382 },
+    { name: "North Campus", lat: 42.2936, lng: -83.7167 },
+    { name: "South Quad", lat: 42.2746, lng: -83.7408 },
+    { name: "Michigan Union", lat: 42.2748, lng: -83.7422 },
+    { name: "Bursley Hall", lat: 42.2925, lng: -83.7193 }
+];
 
 export default function MapComponent() {
     const mapRef = useRef(null);
@@ -11,15 +18,17 @@ export default function MapComponent() {
     const [mapLoaded, setMapLoaded] = useState(false);
     const [map, setMap] = useState(null);
     const [directionsService, setDirectionsService] = useState(null);
-    const [directionsRendererDriver, setDirectionsRendererDriver] = useState(null);
     const [directionsRendererUser, setDirectionsRendererUser] = useState(null);
+    const [directionsRendererDriver, setDirectionsRendererDriver] = useState(null);
     const [userLocation, setUserLocation] = useState(null);
+    const [nearestPickup, setNearestPickup] = useState(null);
+    const [showCallButton, setShowCallButton] = useState(false);
+    const [showDriverInfo, setShowDriverInfo] = useState(false);
     const [driverLocation, setDriverLocation] = useState(null);
-    const [driverToUserDistance, setDriverToUserDistance] = useState(null);
-    const [driverToUserEta, setDriverToUserEta] = useState(null);
-    const [userToDestinationDistance, setUserToDestinationDistance] = useState(null);
-    const [userToDestinationEta, setUserToDestinationEta] = useState(null);
-    const [destination, setDestination] = useState('');
+    const [driverToPickupDistance, setDriverToPickupDistance] = useState(null);
+    const [driverToPickupEta, setDriverToPickupEta] = useState(null);
+    const [userToPickupDistance, setUserToPickupDistance] = useState(null);
+    const [userToPickupEta, setUserToPickupEta] = useState(null);
 
     const firebaseConfig = {
         apiKey: "AIzaSyCTQdkPz9GWnWiwSUv_yyxC8P1IPr1qW1M",
@@ -42,16 +51,14 @@ export default function MapComponent() {
     }, [mapLoaded]);
 
     useEffect(() => {
-        if (userLocation && driverLocation && directionsService && directionsRendererDriver) {
-            calculateAndDisplayDriverToUserRoute();
+        if (userLocation && nearestPickup) {
+            const distance = google.maps.geometry.spherical.computeDistanceBetween(
+                new google.maps.LatLng(userLocation.lat, userLocation.lng),
+                new google.maps.LatLng(nearestPickup.lat, nearestPickup.lng)
+            );
+            setShowCallButton(distance <= 321.869); // 0.2 miles in meters
         }
-    }, [userLocation, driverLocation, directionsService, directionsRendererDriver]);
-
-    useEffect(() => {
-        if (userLocation && destination && directionsService && directionsRendererUser) {
-            calculateAndDisplayUserToDestinationRoute();
-        }
-    }, [userLocation, destination, directionsService, directionsRendererUser]);
+    }, [userLocation, nearestPickup]);
 
     function initMap(database) {
         const newMap = new google.maps.Map(mapRef.current, {
@@ -62,18 +69,20 @@ export default function MapComponent() {
         setMap(newMap);
 
         const newDirectionsService = new google.maps.DirectionsService();
-        const newDirectionsRendererDriver = new google.maps.DirectionsRenderer({
-            map: newMap,
-            polylineOptions: { strokeColor: "blue" }
-        });
         const newDirectionsRendererUser = new google.maps.DirectionsRenderer({
             map: newMap,
-            polylineOptions: { strokeColor: "green" }
+            suppressMarkers: true,
+            polylineOptions: { strokeColor: "#4285F4" } // Blue for user route
+        });
+        const newDirectionsRendererDriver = new google.maps.DirectionsRenderer({
+            map: newMap,
+            suppressMarkers: true,
+            polylineOptions: { strokeColor: "#FBBC04" } // Yellow for driver route
         });
 
         setDirectionsService(newDirectionsService);
-        setDirectionsRendererDriver(newDirectionsRendererDriver);
         setDirectionsRendererUser(newDirectionsRendererUser);
+        setDirectionsRendererDriver(newDirectionsRendererDriver);
 
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(position => {
@@ -96,7 +105,16 @@ export default function MapComponent() {
             console.error("Error: Your browser doesn't support geolocation.");
         }
 
-        simulateDriverMovement(database);
+        // Add markers for pickup locations
+        PICKUP_LOCATIONS.forEach(location => {
+            new google.maps.Marker({
+                position: { lat: location.lat, lng: location.lng },
+                map: newMap,
+                title: location.name,
+                icon: "http://maps.google.com/mapfiles/ms/icons/green-dot.png"
+            });
+        });
+
         listenForDriverLocation(database, newMap);
     }
 
@@ -111,6 +129,9 @@ export default function MapComponent() {
                 };
                 setDriverLocation(driverLoc);
                 updateDriverMarker(map, driverLoc);
+                if (nearestPickup) {
+                    calculateAndDisplayDriverRoute(driverLoc, nearestPickup);
+                }
             }
         }, (error) => {
             console.error("Error listening for driver location: ", error);
@@ -125,38 +146,60 @@ export default function MapComponent() {
                 position: location,
                 map: map,
                 title: "Driver Location",
-                icon: "http://maps.google.com/mapfiles/ms/icons/green-dot.png"
+                icon: "http://maps.google.com/mapfiles/ms/icons/yellow-dot.png"
             });
         }
     }
 
-    function updateLocation(database, userId, lat, lng) {
-        const locationRef = ref(database, 'locations/' + userId);
-        set(locationRef, {
-            latitude: lat,
-            longitude: lng
-        }).catch((error) => {
-            console.error("Error updating location: ", error);
+    function findNearestPickup() {
+        if (!userLocation) return;
+
+        let nearest = null;
+        let minDistance = Infinity;
+
+        PICKUP_LOCATIONS.forEach(location => {
+            const distance = google.maps.geometry.spherical.computeDistanceBetween(
+                new google.maps.LatLng(userLocation.lat, userLocation.lng),
+                new google.maps.LatLng(location.lat, location.lng)
+            );
+
+            if (distance < minDistance) {
+                minDistance = distance;
+                nearest = location;
+            }
+        });
+
+        setNearestPickup(nearest);
+        calculateAndDisplayUserRoute(nearest);
+    }
+
+    function calculateAndDisplayUserRoute(destination) {
+        if (!userLocation || !destination) return;
+
+        const request = {
+            origin: new google.maps.LatLng(userLocation.lat, userLocation.lng),
+            destination: new google.maps.LatLng(destination.lat, destination.lng),
+            travelMode: google.maps.TravelMode.WALKING
+        };
+
+        directionsService.route(request, (result, status) => {
+            if (status === google.maps.DirectionsStatus.OK) {
+                directionsRendererUser.setDirections(result);
+                const route = result.routes[0];
+                setUserToPickupDistance(route.legs[0].distance.text);
+                setUserToPickupEta(route.legs[0].duration.text);
+            } else {
+                console.error('Directions request failed due to ' + status);
+            }
         });
     }
 
-    function simulateDriverMovement(database) {
-        let simulatedLat = 42.2955;
-        let simulatedLng = -83.7200;
-
-        setInterval(() => {
-            simulatedLat -= 0.00005;
-            simulatedLng += 0.0001;
-            updateLocation(database, "driver123", simulatedLat, simulatedLng);
-        }, 5000);
-    }
-
-    function calculateAndDisplayDriverToUserRoute() {
-        if (!userLocation || !driverLocation) return;
+    function calculateAndDisplayDriverRoute(driverLoc, destination) {
+        if (!driverLoc || !destination) return;
 
         const request = {
-            origin: new google.maps.LatLng(driverLocation.lat, driverLocation.lng),
-            destination: new google.maps.LatLng(userLocation.lat, userLocation.lng),
+            origin: new google.maps.LatLng(driverLoc.lat, driverLoc.lng),
+            destination: new google.maps.LatLng(destination.lat, destination.lng),
             travelMode: google.maps.TravelMode.DRIVING
         };
 
@@ -164,41 +207,47 @@ export default function MapComponent() {
             if (status === google.maps.DirectionsStatus.OK) {
                 directionsRendererDriver.setDirections(result);
                 const route = result.routes[0];
-                const leg = route.legs[0];
-                setDriverToUserEta(leg.duration.text);
-                setDriverToUserDistance(leg.distance.text);
+                setDriverToPickupDistance(route.legs[0].distance.text);
+                setDriverToPickupEta(route.legs[0].duration.text);
             } else {
                 console.error('Directions request failed due to ' + status);
             }
         });
     }
 
-    function calculateAndDisplayUserToDestinationRoute() {
-        if (!userLocation || !destination) return;
-
-        const request = {
-            origin: new google.maps.LatLng(userLocation.lat, userLocation.lng),
-            destination: destination,
-            travelMode: google.maps.TravelMode.DRIVING
-        };
-
-        directionsService.route(request, (result, status) => {
-            if (status === google.maps.DirectionsStatus.OK) {
-                directionsRendererUser.setDirections(result);
-                const route = result.routes[0];
-                const leg = route.legs[0];
-                setUserToDestinationEta(leg.duration.text);
-                setUserToDestinationDistance(leg.distance.text);
-            } else {
-                console.error('Directions request failed due to ' + status);
-            }
-        });
+    function handleCallSafeRide() {
+        // In a real app, this would initiate a call
+        alert("Call 734-647-8000 for Safe Ride");
     }
 
-    function handleAddressSubmit(e) {
-        e.preventDefault();
-        if (destination) {
-            calculateAndDisplayUserToDestinationRoute();
+    function handleCalledSafeRide() {
+        setShowDriverInfo(true);
+        // Here you would typically initiate the driver's journey
+        simulateDriverMovement();
+    }
+
+    function simulateDriverMovement() {
+        let simulatedLat = 42.2955;
+        let simulatedLng = -83.7200;
+
+        const interval = setInterval(() => {
+            simulatedLat -= 0.0001;
+            simulatedLng += 0.0002;
+            updateDriverLocation(simulatedLat, simulatedLng);
+
+            // Stop simulation when driver is close to pickup location
+            if (nearestPickup &&
+                Math.abs(simulatedLat - nearestPickup.lat) < 0.001 &&
+                Math.abs(simulatedLng - nearestPickup.lng) < 0.001) {
+                clearInterval(interval);
+            }
+        }, 2000);
+    }
+
+    function updateDriverLocation(lat, lng) {
+        setDriverLocation({ lat, lng });
+        if (nearestPickup) {
+            calculateAndDisplayDriverRoute({ lat, lng }, nearestPickup);
         }
     }
 
@@ -211,41 +260,62 @@ export default function MapComponent() {
             <div id="map" ref={mapRef} className="h-3/4 w-full"></div>
             <div id="info" className="bg-white shadow-md rounded-t-lg -mt-4 flex-grow p-4 space-y-4 pt-8">
                 <a href='/student-home' className='text-blue-500'>Return to Home</a>
-                <form onSubmit={handleAddressSubmit} className="flex space-x-2">
-                    <input
-                        type="text"
-                        value={destination}
-                        onChange={(e) => setDestination(e.target.value)}
-                        placeholder="Enter destination address"
-                        className="flex-grow px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
+
+                {!showDriverInfo && (
                     <button
-                        type="submit"
-                        className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition duration-300 ease-in-out"
+                        onClick={findNearestPickup}
+                        className="w-full bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition duration-300 ease-in-out"
                     >
-                        Route
+                        Find Nearest Pickup Location
                     </button>
-                </form>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div className="bg-gray-200 p-3 rounded-md text-gray-700">
-                        <p className="font-semibold">User Location:</p>
-                        <p>{userLocation ? `${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)}` : 'Loading...'}</p>
+                )}
+
+                {nearestPickup && !showDriverInfo && (
+                    <div className="mt-4 p-4 bg-gray-100 rounded-md text-gray-600">
+                        <p className="font-semibold">Nearest Pickup Location:</p>
+                        <p>{nearestPickup.name}</p>
+                        <p>Distance: {userToPickupDistance}</p>
+                        <p>ETA (Walking): {userToPickupEta}</p>
                     </div>
-                    <div className="bg-gray-200 p-3 rounded-md text-gray-700">
-                        <p className="font-semibold">Driver Location:</p>
-                        <p>{driverLocation ? `${driverLocation.lat.toFixed(4)}, ${driverLocation.lng.toFixed(4)}` : 'Loading...'}</p>
+                )}
+
+                {showCallButton && !showDriverInfo && (
+                    <div className="mt-4">
+                        <p className="mb-2 text-green-600 font-semibold">You're near the pickup location!</p>
+                        <button
+                            onClick={handleCallSafeRide}
+                            className="w-full bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition duration-300 ease-in-out"
+                        >
+                            Call Safe Ride
+                        </button>
+                        <button
+                            onClick={handleCalledSafeRide}
+                            className="w-full mt-2 bg-yellow-500 text-white px-4 py-2 rounded-md hover:bg-yellow-600 transition duration-300 ease-in-out"
+                        >
+                            I've Called
+                        </button>
                     </div>
-                    <div className="bg-gray-200 p-3 rounded-md text-gray-700">
-                        <p className="font-semibold">Driver to User:</p>
-                        <p>Distance - {driverToUserDistance || 'Calculating...'}</p>
-                        <p>ETA - {driverToUserEta || 'Calculating...'}</p>
+                )}
+
+                {showDriverInfo && (
+                    <div className="mt-4 p-4 bg-gray-200 rounded-md text-gray-500">
+                        <h2 className="font-bold text-lg mb-2">Driver Information:</h2>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <p className="font-semibold">Distance to Pickup:</p>
+                                <p>{driverToPickupDistance || 'Calculating...'}</p>
+                            </div>
+                            <div>
+                                <p className="font-semibold">ETA to Pickup:</p>
+                                <p>{driverToPickupEta || 'Calculating...'}</p>
+                            </div>
+                        </div>
+                        <div className="mt-4">
+                            <p className="font-semibold">Your Pickup Location:</p>
+                            <p>{nearestPickup ? nearestPickup.name : 'Not set'}</p>
+                        </div>
                     </div>
-                    <div className="bg-gray-200 p-3 rounded-md text-gray-700">
-                        <p className="font-semibold">User to Destination:</p>
-                        <p>Distance - {userToDestinationDistance || 'Calculating...'}</p>
-                        <p>ETA - {userToDestinationEta || 'Calculating...'}</p>
-                    </div>
-                </div>
+                )}
             </div>
         </main>
     );
