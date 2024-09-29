@@ -11,7 +11,6 @@ const PICKUP_LOCATIONS = [
     { name: "Michigan Union", lat: 42.2748, lng: -83.7422 },
     { name: "Bursley Hall", lat: 42.2925, lng: -83.7193 }
 ];
-
 export default function MapComponent() {
     const mapRef = useRef(null);
     const driverMarkerRef = useRef(null);
@@ -245,9 +244,13 @@ export default function MapComponent() {
     }
 
     function updateDriverLocation(lat, lng) {
-        setDriverLocation({ lat, lng });
+        const newDriverLocation = { lat, lng };
+        setDriverLocation(newDriverLocation);
+        if (map) {
+            updateDriverMarker(map, newDriverLocation);
+        }
         if (nearestPickup) {
-            calculateAndDisplayDriverRoute({ lat, lng }, nearestPickup);
+            calculateAndDisplayDriverRoute(newDriverLocation, nearestPickup);
         }
     }
 
