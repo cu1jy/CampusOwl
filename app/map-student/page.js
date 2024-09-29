@@ -28,6 +28,7 @@ export default function MapComponent() {
     const [driverToPickupEta, setDriverToPickupEta] = useState(null);
     const [userToPickupDistance, setUserToPickupDistance] = useState(null);
     const [userToPickupEta, setUserToPickupEta] = useState(null);
+    const [userId, setUserId] = useState(null);
 
     const firebaseConfig = {
         apiKey: "AIzaSyCTQdkPz9GWnWiwSUv_yyxC8P1IPr1qW1M",
@@ -48,6 +49,11 @@ export default function MapComponent() {
             initMap(database);
         }
     }, [mapLoaded]);
+
+    useEffect(() => {
+        // Generate a random user ID when the component mounts
+        setUserId(Math.random().toString(36).substr(2, 9));
+    }, []);
 
     useEffect(() => {
         if (userLocation && nearestPickup) {
@@ -216,6 +222,35 @@ export default function MapComponent() {
 
     function handleCallSafeRide() {
         // In a real app, this would initiate a call
+        if (!nearestPickup || !userId) {
+            console.error("Nearest pickup or user ID not set");
+            return;
+        }
+
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        const pendingRef = ref(database, 'pending');
+
+        const newRequest = {
+            user: userId,
+            destination: {
+                lat: nearestPickup.lat,
+                lng: nearestPickup.lng
+            },
+            status: "pending",
+            requestTime: new Date().toISOString()
+        };
+
+        push(pendingRef, newRequest)
+            .then(() => {
+                console.log("New request added to the database");
+                alert("Your ride request has been submitted!");
+                handleCalledSafeRide(); // Proceed to show driver info
+            })
+            .catch((error) => {
+                console.error("Error adding new request: ", error);
+                alert("There was an error submitting your request. Please try again.");
+            });
         alert("Call 734-647-8000 for Safe Ride");
     }
 
@@ -289,7 +324,7 @@ export default function MapComponent() {
                             onClick={handleCallSafeRide}
                             className="w-full bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 transition duration-300 ease-in-out"
                         >
-                            Call Safe Ride
+                            Call Ride
                         </button>
                         <button
                             onClick={handleCalledSafeRide}
