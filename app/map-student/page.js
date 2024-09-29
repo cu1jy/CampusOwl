@@ -210,6 +210,7 @@ export default function MapComponent() {
             />
             <div id="map" ref={mapRef} className="h-3/4 w-full"></div>
             <div id="info" className="bg-white shadow-md rounded-t-lg -mt-4 flex-grow p-4 space-y-4 pt-8">
+                <a href='/student-home' className='text-blue-500'>Return to Home</a>
                 <form onSubmit={handleAddressSubmit} className="flex space-x-2">
                     <input
                         type="text"
