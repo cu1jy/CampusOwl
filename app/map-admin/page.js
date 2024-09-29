@@ -1,9 +1,9 @@
-'use client';
-
+"use client";
 import { useEffect, useRef, useState } from 'react';
 import Script from 'next/script';
 import { initializeApp } from "firebase/app";
-import { getDatabase, ref, set, onValue } from "firebase/database";
+import { getDatabase, ref, onValue, update, remove } from "firebase/database";
+import { Clock } from 'lucide-react';
 
 const PICKUP_LOCATIONS = [
     { name: "Central Campus Transit Center", lat: 42.2778, lng: -83.7382 },
@@ -18,23 +18,50 @@ const DRIVER_LOCATIONS = [
     { name: "Driver 2", lat: 42.2941, lng: -83.7153 },
     { name: "Driver 3", lat: 42.2750, lng: -83.7413 },
     { name: "Driver 4", lat: 42.2743, lng: -83.7430 }
-]
+];
 
-export default function MapComponent() {
+const DriveRequestItem = ({ id, requestTime, status, destination, onComplete, onCancel, onMatch }) => (
+    <div className="bg-white p-6 rounded-lg shadow-md relative mb-4">
+        <div className="flex justify-between items-center mb-4">
+            <div className="flex items-center">
+                <Clock className="mr-2 text-blue-600" size={24} />
+                <h2 className="text-xl font-semibold text-black">Drive Request #{id}</h2>
+            </div>
+            <div className="flex items-center">
+                <span className={`px-2 py-1 rounded-full text-sm ${status === 'Pending' ? 'bg-yellow-200 text-yellow-800' : 'bg-green-200 text-green-800'}`}>
+                    {status}
+                </span>
+            </div>
+        </div>
+        <p className="text-gray-600 mb-2">Requested: {requestTime}</p>
+        <p className="text-gray-600 mb-4">Destination: {destination.lat.toFixed(4)}, {destination.lng.toFixed(4)}</p>
+        {status === 'Pending' && (
+            <div className="flex justify-end space-x-2">
+                <button onClick={onMatch} className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600">
+                    Match
+                </button>
+                <button onClick={onComplete} className="bg-green-500 text-white px-4 py-2 rounded hover:bg-green-600">
+                    Complete
+                </button>
+                <button onClick={onCancel} className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600">
+                    Cancel
+                </button>
+            </div>
+        )}
+    </div>
+);
+
+export default function AdminMapComponent() {
     const mapRef = useRef(null);
-    const driverMarkerRef = useRef(null);
     const [mapLoaded, setMapLoaded] = useState(false);
     const [map, setMap] = useState(null);
     const [directionsService, setDirectionsService] = useState(null);
-    const [directionsRendererDriver, setDirectionsRendererDriver] = useState(null);
-    const [directionsRendererUser, setDirectionsRendererUser] = useState(null);
-    const [userLocation, setUserLocation] = useState(null);
-    const [driverLocation, setDriverLocation] = useState(null);
-    const [driverToUserDistance, setDriverToUserDistance] = useState(null);
-    const [driverToUserEta, setDriverToUserEta] = useState(null);
-    const [userToDestinationDistance, setUserToDestinationDistance] = useState(null);
-    const [userToDestinationEta, setUserToDestinationEta] = useState(null);
-    const [destination, setDestination] = useState('');
+    const [directionsRenderer, setDirectionsRenderer] = useState(null);
+    const [driveRequests, setDriveRequests] = useState([]);
+    const [selectedRequest, setSelectedRequest] = useState(null);
+    const [matchedDriver, setMatchedDriver] = useState(null);
+    const [eta, setEta] = useState(null);
+    const [distance, setDistance] = useState(null);
 
     const firebaseConfig = {
         apiKey: "AIzaSyCTQdkPz9GWnWiwSUv_yyxC8P1IPr1qW1M",
@@ -52,23 +79,29 @@ export default function MapComponent() {
         const database = getDatabase(app);
 
         if (typeof window !== 'undefined' && mapLoaded) {
-            initMap(database);
+            initMap();
         }
+
+        const pendingRequestsRef = ref(database, 'pending');
+        onValue(pendingRequestsRef, (snapshot) => {
+            const data = snapshot.val();
+            if (data) {
+                const sortedRequests = Object.entries(data)
+                    .map(([key, value]) => ({
+                        id: key,
+                        ...value,
+                        destination: value.destination,
+                        requestTime: value.requestTime
+                    }))
+                    .sort((a, b) => new Date(a.requestTime) - new Date(b.requestTime));
+                setDriveRequests(sortedRequests);
+            } else {
+                setDriveRequests([]);
+            }
+        });
     }, [mapLoaded]);
 
-    useEffect(() => {
-        if (userLocation && driverLocation && directionsService && directionsRendererDriver) {
-            calculateAndDisplayDriverToUserRoute();
-        }
-    }, [userLocation, driverLocation, directionsService, directionsRendererDriver]);
-
-    useEffect(() => {
-        if (userLocation && destination && directionsService && directionsRendererUser) {
-            calculateAndDisplayUserToDestinationRoute();
-        }
-    }, [userLocation, destination, directionsService, directionsRendererUser]);
-
-    function initMap(database) {
+    function initMap() {
         const newMap = new google.maps.Map(mapRef.current, {
             zoom: 14,
             center: { lat: 42.2808, lng: -83.7430 }, // Ann Arbor
@@ -77,190 +110,165 @@ export default function MapComponent() {
         setMap(newMap);
 
         const newDirectionsService = new google.maps.DirectionsService();
-        const newDirectionsRendererDriver = new google.maps.DirectionsRenderer({
+        const newDirectionsRenderer = new google.maps.DirectionsRenderer({
             map: newMap,
-            polylineOptions: { strokeColor: "blue" }
-        });
-        const newDirectionsRendererUser = new google.maps.DirectionsRenderer({
-            map: newMap,
-            polylineOptions: { strokeColor: "green" }
+            suppressMarkers: true
         });
 
         setDirectionsService(newDirectionsService);
-        setDirectionsRendererDriver(newDirectionsRendererDriver);
-        setDirectionsRendererUser(newDirectionsRendererUser);
+        setDirectionsRenderer(newDirectionsRenderer);
 
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(position => {
-                const location = {
-                    lat: position.coords.latitude,
-                    lng: position.coords.longitude
-                };
-                setUserLocation(location);
-                newMap.setCenter(location);
-                new google.maps.Marker({
-                    position: location,
-                    map: newMap,
-                    title: "Your Location",
-                    icon: "http://maps.google.com/mapfiles/ms/icons/blue-dot.png"
-                });
-            }, () => {
-                console.error("Error: The Geolocation service failed.");
-            });
-        } else {
-            console.error("Error: Your browser doesn't support geolocation.");
-        }
-
-        simulateDriverMovement(database);
-        listenForDriverLocation(database, newMap);
-    }
-
-    function listenForDriverLocation(database, map) {
-        const driverLocationRef = ref(database, 'locations/driver123');
-        onValue(driverLocationRef, (snapshot) => {
-            const location = snapshot.val();
-            if (location) {
-                const driverLoc = {
-                    lat: location.latitude,
-                    lng: location.longitude
-                };
-                setDriverLocation(driverLoc);
-                updateDriverMarker(map, driverLoc);
-            }
-        }, (error) => {
-            console.error("Error listening for driver location: ", error);
-        });
-    }
-
-    function updateDriverMarker(map, location) {
-        if (driverMarkerRef.current) {
-            driverMarkerRef.current.setPosition(location);
-        } else {
-            driverMarkerRef.current = new google.maps.Marker({
-                position: location,
-                map: map,
-                title: "Driver Location",
+        // Add markers for pickup locations
+        PICKUP_LOCATIONS.forEach(location => {
+            new google.maps.Marker({
+                position: { lat: location.lat, lng: location.lng },
+                map: newMap,
+                title: location.name,
                 icon: "http://maps.google.com/mapfiles/ms/icons/green-dot.png"
             });
-        }
-    }
+        });
 
-    function updateLocation(database, userId, lat, lng) {
-        const locationRef = ref(database, 'locations/' + userId);
-        set(locationRef, {
-            latitude: lat,
-            longitude: lng
-        }).catch((error) => {
-            console.error("Error updating location: ", error);
+        // Add markers for drivers
+        DRIVER_LOCATIONS.forEach(location => {
+            new google.maps.Marker({
+                position: { lat: location.lat, lng: location.lng },
+                map: newMap,
+                title: location.name,
+                icon: "http://maps.google.com/mapfiles/ms/icons/yellow-dot.png"
+            });
         });
     }
 
-    function simulateDriverMovement(database) {
-        let simulatedLat = 42.2955;
-        let simulatedLng = -83.7200;
-
-        setInterval(() => {
-            simulatedLat -= 0.00005;
-            simulatedLng += 0.0001;
-            updateLocation(database, "driver123", simulatedLat, simulatedLng);
-        }, 5000);
+    function handleMatch(request) {
+        setSelectedRequest(request);
+        const closestDriver = findClosestDriver(request.destination);
+        setMatchedDriver(closestDriver);
+        calculateRoute(closestDriver, request.destination);
     }
 
-    function calculateAndDisplayDriverToUserRoute() {
-        if (!userLocation || !driverLocation) return;
+    function findClosestDriver(destination) {
+        let closestDriver = null;
+        let minDistance = Infinity;
+
+        DRIVER_LOCATIONS.forEach(driver => {
+            const distance = google.maps.geometry.spherical.computeDistanceBetween(
+                new google.maps.LatLng(driver.lat, driver.lng),
+                new google.maps.LatLng(destination.lat, destination.lng)
+            );
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestDriver = driver;
+            }
+        });
+
+        return closestDriver;
+    }
+
+    function calculateRoute(driver, destination) {
+        if (!driver || !destination) return;
 
         const request = {
-            origin: new google.maps.LatLng(driverLocation.lat, driverLocation.lng),
-            destination: new google.maps.LatLng(userLocation.lat, userLocation.lng),
+            origin: new google.maps.LatLng(driver.lat, driver.lng),
+            destination: new google.maps.LatLng(destination.lat, destination.lng),
             travelMode: google.maps.TravelMode.DRIVING
         };
 
         directionsService.route(request, (result, status) => {
             if (status === google.maps.DirectionsStatus.OK) {
-                directionsRendererDriver.setDirections(result);
+                directionsRenderer.setDirections(result);
                 const route = result.routes[0];
-                const leg = route.legs[0];
-                setDriverToUserEta(leg.duration.text);
-                setDriverToUserDistance(leg.distance.text);
+                setEta(route.legs[0].duration.text);
+                setDistance(route.legs[0].distance.text);
             } else {
                 console.error('Directions request failed due to ' + status);
             }
         });
     }
 
-    function calculateAndDisplayUserToDestinationRoute() {
-        if (!userLocation || !destination) return;
+    function handleComplete(id) {
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        const requestRef = ref(database, `pending/${id}`);
 
-        const request = {
-            origin: new google.maps.LatLng(userLocation.lat, userLocation.lng),
-            destination: destination,
-            travelMode: google.maps.TravelMode.DRIVING
-        };
-
-        directionsService.route(request, (result, status) => {
-            if (status === google.maps.DirectionsStatus.OK) {
-                directionsRendererUser.setDirections(result);
-                const route = result.routes[0];
-                const leg = route.legs[0];
-                setUserToDestinationEta(leg.duration.text);
-                setUserToDestinationDistance(leg.distance.text);
-            } else {
-                console.error('Directions request failed due to ' + status);
-            }
-        });
+        update(requestRef, { status: 'Completed' })
+            .then(() => {
+                console.log('Request marked as completed');
+                setSelectedRequest(null);
+                setMatchedDriver(null);
+                setEta(null);
+                setDistance(null);
+                if (directionsRenderer) {
+                    directionsRenderer.setDirections({ routes: [] });
+                }
+            })
+            .catch((error) => {
+                console.error('Error updating request:', error);
+            });
     }
 
-    function handleAddressSubmit(e) {
-        e.preventDefault();
-        if (destination) {
-            calculateAndDisplayUserToDestinationRoute();
-        }
+    function handleCancel(id) {
+        const app = initializeApp(firebaseConfig);
+        const database = getDatabase(app);
+        const requestRef = ref(database, `pending/${id}`);
+
+        remove(requestRef)
+            .then(() => {
+                console.log('Request cancelled and removed');
+                setSelectedRequest(null);
+                setMatchedDriver(null);
+                setEta(null);
+                setDistance(null);
+                if (directionsRenderer) {
+                    directionsRenderer.setDirections({ routes: [] });
+                }
+            })
+            .catch((error) => {
+                console.error('Error cancelling request:', error);
+            });
     }
 
     return (
-        <main className="h-screen w-screen flex flex-col bg-gray-100">
+        <main className="h-screen w-screen flex bg-gray-100">
             <Script
                 src={`https://maps.googleapis.com/maps/api/js?key=AIzaSyCoY5Mc8LL_Frtd0oW5wXKj0_sEicPLUN0&libraries=geometry,places`}
                 onLoad={() => setMapLoaded(true)}
             />
-            <div id="map" ref={mapRef} className="h-3/4 w-full"></div>
-            <div id="info" className="bg-white shadow-md rounded-t-lg -mt-4 flex-grow p-4 space-y-4 pt-8">
+            <div className="w-1/3 bg-white p-4 overflow-y-auto">
                 <a href='/admin-home' className='text-blue-500'>Return to Home</a>
-                <form onSubmit={handleAddressSubmit} className="flex space-x-2">
-                    <input
-                        type="text"
-                        value={destination}
-                        onChange={(e) => setDestination(e.target.value)}
-                        placeholder="Enter destination address"
-                        className="flex-grow px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                <h1 className="text-2xl font-bold mb-4 text-black">Incoming Drive Requests</h1>
+                {driveRequests.map(request => (
+                    <DriveRequestItem
+                        key={request.id}
+                        {...request}
+                        onMatch={() => handleMatch(request)}
+                        onComplete={() => handleComplete(request.id)}
+                        onCancel={() => handleCancel(request.id)}
                     />
-                    <button
-                        type="submit"
-                        className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600 transition duration-300 ease-in-out"
-                    >
-                        Route
-                    </button>
-                </form>
-                <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div className="bg-gray-200 p-3 rounded-md text-gray-700">
-                        <p className="font-semibold">User Location:</p>
-                        <p>{userLocation ? `${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)}` : 'Loading...'}</p>
+                ))}
+            </div>
+            <div className="w-2/3 flex flex-col">
+                <div id="map" ref={mapRef} className="h-full w-full"></div>
+                {selectedRequest && matchedDriver && (
+                    <div id="info" className="bg-white shadow-md p-4 space-y-4">
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div className="bg-gray-200 p-3 rounded-md text-gray-700">
+                                <p className="font-semibold">Selected Request:</p>
+                                <p>ID: {selectedRequest.id}</p>
+                                <p>Destination: {selectedRequest.destination.lat.toFixed(4)}, {selectedRequest.destination.lng.toFixed(4)}</p>
+                            </div>
+                            <div className="bg-gray-200 p-3 rounded-md text-gray-700">
+                                <p className="font-semibold">Matched Driver:</p>
+                                <p>Name: {matchedDriver.name}</p>
+                                <p>Location: {matchedDriver.lat.toFixed(4)}, {matchedDriver.lng.toFixed(4)}</p>
+                            </div>
+                            <div className="bg-gray-200 p-3 rounded-md text-gray-700">
+                                <p className="font-semibold">Route Information:</p>
+                                <p>ETA: {eta || 'Calculating...'}</p>
+                                <p>Distance: {distance || 'Calculating...'}</p>
+                            </div>
+                        </div>
                     </div>
-                    <div className="bg-gray-200 p-3 rounded-md text-gray-700">
-                        <p className="font-semibold">Driver Location:</p>
-                        <p>{driverLocation ? `${driverLocation.lat.toFixed(4)}, ${driverLocation.lng.toFixed(4)}` : 'Loading...'}</p>
-                    </div>
-                    <div className="bg-gray-200 p-3 rounded-md text-gray-700">
-                        <p className="font-semibold">Driver to User:</p>
-                        <p>Distance - {driverToUserDistance || 'Calculating...'}</p>
-                        <p>ETA - {driverToUserEta || 'Calculating...'}</p>
-                    </div>
-                    <div className="bg-gray-200 p-3 rounded-md text-gray-700">
-                        <p className="font-semibold">User to Destination:</p>
-                        <p>Distance - {userToDestinationDistance || 'Calculating...'}</p>
-                        <p>ETA - {userToDestinationEta || 'Calculating...'}</p>
-                    </div>
-                </div>
+                )}
             </div>
         </main>
     );
