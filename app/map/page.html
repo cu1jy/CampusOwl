@@ -30,6 +30,28 @@
     <div id="map"></div>
     <div id="eta"></div> <!-- This will show the ETA -->
 
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-database.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-auth.js"></script>
+
+    <script>
+        // Initialize Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyCTQdkPz9GWnWiwSUv_yyxC8P1IPr1qW1M",
+            authDomain: "campusowl-71f53.firebaseapp.com",
+            databaseURL: "https://campusowl-71f53-default-rtdb.firebaseio.com",
+            projectId: "campusowl-71f53",
+            storageBucket: "campusowl-71f53.appspot.com",
+            messagingSenderId: "1023330583662",
+            appId: "1:1023330583662:web:48a701e4974829c378127f",
+            measurementId: "G-P4NGYXMZ3Q"
+        };
+
+
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+    </script>
+
     <script>
         let map, directionsService, directionsRenderer, userLocation;
 
@@ -62,10 +84,157 @@
                 stylers: [{ visibility: "off" }]
             }
         ];
+        function updateLocation(userId, lat, lng) {
+            const locationRef = database.ref('locations/' + userId);
+            locationRef.set({
+                latitude: lat,
+                longitude: lng
+            });
+        }
 
+        function listenForDriverLocation(driverId) {
+            const driverLocationRef = database.ref('locations/' + driverId);
+            driverLocationRef.on('value', snapshot => {
+                const location = snapshot.val();
+                if (location) {
+                    const latLng = new google.maps.LatLng(location.latitude, location.longitude);
+                    // Update the driver's marker on the map
+                    if (!driverMarker) {
+                        driverMarker = new google.maps.Marker({
+                            position: latLng,
+                            map: map,
+                            title: "Driver's Location",
+                            // icon: {
+                            //     url: "https://maps.google.com/mapfiles/ms/icons/blue-dot.png"
+                            // }
+                        });
+
+                    } else {
+                        driverMarker.setPosition(latLng);
+                    }
+                    map.panTo(latLng); // Center map on driver
+
+                    // Update distance and route to the driver
+                    updateDistanceToDriver(latLng);
+                    calculateRouteToDriver(latLng);
+                }
+            });
+        }
+
+        function updateDistanceToDriver(driverLatLng) {
+            if (userLocation) {
+                const userLatLng = new google.maps.LatLng(userLocation.lat, userLocation.lng);
+                const distance = google.maps.geometry.spherical.computeDistanceBetween(userLatLng, driverLatLng);
+                document.getElementById('distance').innerHTML = `Distance to driver: ${(distance / 1000).toFixed(2)} km`;
+            }
+        }
+
+        function calculateRouteToDriver(driverLatLng) {
+            if (userLocation) {
+                const request = {
+                    origin: driverLatLng,
+                    destination: userLocation,
+                    travelMode: 'DRIVING'
+                };
+
+                directionsService.route(request, function (result, status) {
+                    if (status === 'OK') {
+                        directionsRenderer.setDirections(result);
+                    } else {
+                        console.error('Directions request failed due to ' + status);
+                    }
+                });
+            }
+        }
+
+        function simulateDriverMovement(driverId) {
+            let simulatedLat = 42.2808; // Starting latitude
+            let simulatedLng = -83.7430; // Starting longitude
+
+            // Simulate the driver's movement every 5 seconds
+            setInterval(() => {
+                // Update the simulated coordinates
+                simulatedLat += 0.0001; // Move slightly north
+                simulatedLng -= 0.0001; // Move slightly west
+
+                // Update the location in Firebase
+                updateLocation(driverId, simulatedLat, simulatedLng);
+            }, 1000); // Update every 1 seconds
+        }
+
+
+        // function trackDriverLocation(driverId) {
+        //     navigator.geolocation.watchPosition(position => {
+        //         const { latitude, longitude } = position.coords;
+        //         updateLocation(driverId, latitude, longitude); // Update location in Firebase
+        //     }, function (error) {
+        //         console.error("Error watching position: ", error);
+        //     }, {
+        //         enableHighAccuracy: true,
+        //         maximumAge: 30000, // Cache the location for 30 seconds
+        //         timeout: 27000    // Timeout after 27 seconds
+        //     });
+        // }
+
+
+        function calculateRoute() {
+            const destinationAddress = document.getElementById('destination-input').value;
+            if (!destinationAddress) {
+                alert("Please enter a destination address.");
+                return;
+            }
+
+            // Use Geocoding API to convert the address to coordinates
+            const geocoder = new google.maps.Geocoder();
+
+            geocoder.geocode({ address: destinationAddress }, function (results, status) {
+                if (status === 'OK') {
+                    const destinationLocation = results[0].geometry.location;
+
+                    // Create a request for directions to the destination
+                    const request = {
+                        origin: userLocation, // User's current location
+                        destination: destinationLocation, // User-entered destination
+                        travelMode: 'DRIVING' // Can be BICYCLING, TRANSIT, WALKING
+                    };
+
+                    // Route the directions and display on the map
+                    directionsService.route(request, function (result, status) {
+                        if (status == 'OK') {
+                            directionsRenderer.setDirections(result);
+
+                            // Get the duration from the first leg of the route
+                            const duration = result.routes[0].legs[0].duration.text;
+
+                            // Display ETA (duration)
+                            document.getElementById('eta').innerHTML = `Estimated travel time: ${duration}`;
+                        } else {
+                            console.error('Directions request failed due to ' + status);
+                        }
+                    });
+
+                } else {
+                    alert('Geocode was not successful for the following reason: ' + status);
+                }
+            });
+        }
+
+        function addMarkers() {
+            locations.forEach(location => {
+                const marker = new google.maps.Marker({
+                    position: location,
+                    map: map,
+                    title: location.title
+                });
+            });
+        }
+
+        // Call this function when the driver starts a ride
         function initMap() {
+            var driver = true; // Set to true if this user is a driver
+
             // Initialize map with default options
-            var options = {
+            const options = {
                 zoom: 17,
                 center: { lat: 42.2808, lng: -83.7430 }, // Default center (Ann Arbor, MI)
                 styles: mapStyles
@@ -95,7 +264,15 @@
                         map: map,
                         title: "Your Location"
                     });
-                    addMarkers();
+
+                    // If this user is a driver, track their location
+                    if (driver) {
+                        simulateDriverMovement("driver123");
+                        // trackDriverLocation("driver123"); // Replace with actual driver ID
+                    }
+
+                    // Listen for updates to the driver's location (useful for the passenger)
+                    listenForDriverLocation("driver123"); // Replace with actual driver ID
 
                 }, function () {
                     handleLocationError(true, map.getCenter());
@@ -113,57 +290,7 @@
             );
         }
 
-        function calculateRoute() {
-            const destinationAddress = document.getElementById('destination-input').value;
-            if (!destinationAddress) {
-                alert("Please enter a destination address.");
-                return;
-            }
 
-            // Use Geocoding API to convert the address to coordinates
-            const geocoder = new google.maps.Geocoder();
-
-            geocoder.geocode({ address: destinationAddress }, function (results, status) {
-                if (status === 'OK') {
-                    const destinationLocation = results[0].geometry.location;
-
-                    // Create a request for directions
-                    const request = {
-                        origin: userLocation, // User's current location
-                        destination: destinationLocation, // User-entered destination
-                        travelMode: 'DRIVING' // Can be BICYCLING, TRANSIT, WALKING
-                    };
-
-                    // Route the directions and display on the map
-                    directionsService.route(request, function (result, status) {
-                        if (status == 'OK') {
-                            directionsRenderer.setDirections(result);
-
-                            // Get the duration from the first leg of the route
-                            const duration = result.routes[0].legs[0].duration.text;
-
-                            // Display ETA (duration)
-                            document.getElementById('eta').innerHTML = `Estimated travel time: ${duration}`;
-                        } else {
-                            console.error('Directions request failed due to ' + status);
-                        }
-                    });
-
-                } else {
-                    alert('Geocode was not successful for the following reason: ' + status);
-                }
-            });
-
-            function addMarkers() {
-                locations.forEach(location => {
-                    const marker = new google.maps.Marker({
-                        position: location,
-                        map: map,
-                        title: location.title
-                    });
-                });
-            }
-        }
     </script>
     <script async defer
         src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCoY5Mc8LL_Frtd0oW5wXKj0_sEicPLUN0&callback=initMap">
