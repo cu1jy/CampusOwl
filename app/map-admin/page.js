@@ -25,7 +25,7 @@ const DriveRequestItem = ({ id, requestTime, status, destination, onComplete, on
         <div className="flex justify-between items-center mb-4">
             <div className="flex items-center">
                 <Clock className="mr-2 text-blue-600" size={24} />
-                <h2 className="text-xl font-semibold text-black">Drive Request #{id}</h2>
+                <h2 className="text-xl font-semibold text-black">Drive Request {id}</h2>
             </div>
             <div className="flex items-center">
                 <span className={`px-2 py-1 rounded-full text-sm ${status === 'Pending' ? 'bg-yellow-200 text-yellow-800' : 'bg-green-200 text-green-800'}`}>
@@ -91,7 +91,8 @@ export default function AdminMapComponent() {
                         id: key,
                         ...value,
                         destination: value.destination,
-                        requestTime: value.requestTime
+                        requestTime: value.requestTime,
+                        status: "Pending"
                     }))
                     .sort((a, b) => new Date(a.requestTime) - new Date(b.requestTime));
                 setDriveRequests(sortedRequests);
@@ -137,6 +138,15 @@ export default function AdminMapComponent() {
                 icon: "http://maps.google.com/mapfiles/ms/icons/yellow-dot.png"
             });
         });
+
+        driveRequests.forEach(request => {
+            new google.maps.Marker({
+                position: { lat: request.destination.lat, lng: request.destination.lng },
+                map: newMap,
+                title: `Request ID: ${request.id}`,
+                icon: "http://maps.google.com/mapfiles/ms/icons/red-dot.png" // Red dot for requests
+            });
+        })
     }
 
     function handleMatch(request) {
@@ -203,6 +213,21 @@ export default function AdminMapComponent() {
             })
             .catch((error) => {
                 console.error('Error updating request:', error);
+            });
+
+        remove(requestRef)
+            .then(() => {
+                console.log('Request completed and removed');
+                setSelectedRequest(null);
+                setMatchedDriver(null);
+                setEta(null);
+                setDistance(null);
+                if (directionsRenderer) {
+                    directionsRenderer.setDirections({ routes: [] });
+                }
+            })
+            .catch((error) => {
+                console.error('Error completing request:', error);
             });
     }
 
